@@ -51,7 +51,6 @@ export default auth((req) => {
   if (isLoggedIn && isAuthRoute) {
     return NextResponse.redirect(new URL("/dashboard", nextUrl))
   }
-
   // If user is not logged in and trying to access protected routes, redirect to login
   if (!isLoggedIn && !isPublicRoute) {
     let callbackUrl = nextUrl.pathname
@@ -60,8 +59,18 @@ export default auth((req) => {
     }
     
     const encodedCallbackUrl = encodeURIComponent(callbackUrl)
+    
+    // Add a message parameter to indicate why they're being redirected
+    let message = ""
+    if (nextUrl.pathname === "/dashboard") {
+      message = "Please login to access your dashboard."
+    } else {
+      message = "Please login to continue."
+    }
+    const encodedMessage = encodeURIComponent(message)
+    
     return NextResponse.redirect(
-      new URL(`/auth/login?callbackUrl=${encodedCallbackUrl}`, nextUrl)
+      new URL(`/auth/login?callbackUrl=${encodedCallbackUrl}&message=${encodedMessage}`, nextUrl)
     )
   }
 

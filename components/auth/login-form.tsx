@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
@@ -21,7 +21,16 @@ export function LoginForm({
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<Partial<SigninFormData>>({});
   const [generalError, setGeneralError] = useState("");
+  const [redirectMessage, setRedirectMessage] = useState("");
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const message = searchParams.get("message");
+    if (message) {
+      setRedirectMessage(decodeURIComponent(message));
+    }
+  }, [searchParams]);
 
   const togglePasswordVisibility = () => {
     setShowPassword(!showPassword);
@@ -49,11 +58,14 @@ export function LoginForm({
         password: validatedData.password,
         redirect: false,
       });
-
       if (result?.error) {
         setGeneralError("Invalid employee ID or password");
       } else if (result?.ok) {
-        router.push("/dashboard");
+        // Redirect to callback URL if present, otherwise dashboard
+        const callbackUrl = searchParams.get("callbackUrl");
+        router.push(
+          callbackUrl ? decodeURIComponent(callbackUrl) : "/dashboard"
+        );
       }
     } catch (error: any) {
       if (error.errors) {
@@ -75,13 +87,13 @@ export function LoginForm({
         <CardContent className="grid p-0 md:grid-cols-2">
           <form className="p-6 md:p-8" onSubmit={handleSubmit}>
             <div className="flex flex-col gap-6">
+              {" "}
               <div className="flex flex-col items-center text-center">
                 <h1 className="text-2xl font-bold">Welcome back Guardian!</h1>
                 <p className="text-balance text-muted-foreground">
                   Login to SJA Card Record System
                 </p>
               </div>
-
               <div className="grid gap-2">
                 <Label htmlFor="employeeId">Employee ID</Label>
                 <Input
@@ -131,14 +143,18 @@ export function LoginForm({
                     )}
                   </Button>
                 </div>
+                {redirectMessage && (
+                  <div className="text-sm text-yellow-600">
+                    {redirectMessage}
+                  </div>
+                )}
+
                 {errors.password && (
                   <p className="text-sm text-red-600">{errors.password}</p>
                 )}
               </div>
               {generalError && (
-                <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md">
-                  {generalError}
-                </div>
+                <p className="text-sm text-red-600">{generalError}</p>
               )}
               <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading ? "Logging in..." : "Login"}
