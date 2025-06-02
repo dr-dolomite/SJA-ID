@@ -1,0 +1,156 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN // Can manage user accounts, view student records except grades
+  PRINCIPAL // Can access all student records including grades
+  TEACHER // Can only add/modify grades for subjects they teach
+  REGISTRAR // Can access all student records except modifying grades
+  SCHOOL_ADMIN // Can access all student records except modifying grades
+}
+
+enum AcademicTrack {
+  STEM // Science, Technology, Engineering, Mathematics
+  ABM // Accountancy, Business, Management
+  HUMSS // Humanities and Social Sciences
+  GAS // General Academic Strand
+  TVL // Technical-Vocational-Livelihood
+  ARTS_DESIGN // Arts and Design
+  SPORTS // Sports Track
+}
+
+model User {
+  id         Int      @id @default(autoincrement())
+  employeeId String   @unique // Format: 403950-0000
+  password   String // Will be hashed
+  firstName  String
+  lastName   String
+  role       UserRole
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relationships
+  teacherSubjects TeacherSubject[] // Subjects taught by this teacher
+  gradesEntered   Grade[] // Grades entered by this teacher
+  logsCreated     ActivityLog[] // System logs created by this user
+}
+
+model Student {
+  id               Int            @id @default(autoincrement())
+  studentId        String         @unique // School ID number
+  studentLrn       String         @unique // Learner Reference Number (fixed typo)
+  firstName        String
+  lastName         String
+  middleName       String?
+  dateOfBirth      DateTime
+  gender           String
+  address          String
+  contactNumber    String?
+  guardianName     String
+  guardianContact  String
+  yearLevel        Int
+  section          String
+  academicTrack    AcademicTrack? // Academic track/strand for Senior High School (Grades 11-12 only)
+  enrollmentStatus String
+  enrollmentDate   DateTime
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  // Relationships
+  studentSubjects StudentSubject[] // Subjects enrolled by this student
+}
+
+model Subject {
+  id            Int            @id @default(autoincrement())
+  subjectCode   String         @unique
+  subjectName   String
+  description   String?
+  yearLevel     Int
+  academicTrack AcademicTrack? // Some subjects are track-specific, others are general
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  // Relationships
+  teachers        TeacherSubject[] // Teachers who teach this subject
+  studentSubjects StudentSubject[] // Students enrolled in this subject
+}
+
+// Junction table for students and subjects with enrollment info
+model StudentSubject {
+  id           Int      @id @default(autoincrement())
+  studentId    Int
+  subjectId    Int
+  academicYear String
+  semester     String? // For college-level subjects
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relationships
+  student Student @relation(fields: [studentId], references: [id])
+  subject Subject @relation(fields: [subjectId], references: [id])
+  grades  Grade[] // Grades for this student-subject combination
+
+  @@unique([studentId, subjectId, academicYear])
+}
+
+model TeacherSubject {
+  id           Int      @id @default(autoincrement())
+  teacherId    Int
+  subjectId    Int
+  academicYear String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relationships
+  teacher User    @relation(fields: [teacherId], references: [id])
+  subject Subject @relation(fields: [subjectId], references: [id])
+
+  @@unique([teacherId, subjectId, academicYear])
+}
+
+model Grade {
+  id               Int      @id @default(autoincrement())
+  studentSubjectId Int // References the StudentSubject enrollment
+  teacherId        Int // Teacher who entered the grade
+  term             String // FIRST_QUARTER, SECOND_QUARTER, etc.
+  score            Float
+  letterGrade      String?
+  remarks          String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  // Relationships
+  studentSubject StudentSubject @relation(fields: [studentSubjectId], references: [id])
+  teacher        User           @relation(fields: [teacherId], references: [id])
+
+  @@unique([studentSubjectId, term])
+}
+
+model ActivityLog {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  action     String
+  details    String
+  entityType String // STUDENT, GRADE, USER, etc.
+  entityId   Int
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+
+  // Relationships
+  user User @relation(fields: [userId], references: [id])
+}
